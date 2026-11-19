@@ -1,0 +1,26 @@
+{
+    "targets": [
+        "swap"
+    ],
+    "passes": [
+        {
+            "name": "corpserun_static",
+            "intarget": "minecraft:main",
+            "outtarget": "swap",
+            "uniforms": [
+                { "name": "Strength",  "values": [ 0.025 ] },
+                { "name": "Cells",     "values": [ 135.0 ] },
+                { "name": "Levels",    "values": [ 4.0 ] },
+                { "name": "Tint",      "values": [ 0.80, 0.80, 1.00 ] },
+                { "name": "Rate",      "values": [ 5.0 ] },
+                { "name": "Vibrance",  "values": [ 3.0 ] },
+                { "name": "Shadows",   "values": [ 1.8 ] }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "swap",
+            "outtarget": "minecraft:main"
+        }
+    ]
+}

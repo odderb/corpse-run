@@ -1,0 +1,182 @@
+// Local multiplayer test: `./gradlew :neoforge:runMultiplayer` or `./gradlew :fabric:runMultiplayer`.
+//
+// Starts a dedicated server, waits until it accepts connections, then starts two clients (Player1 and Player2) that
+// join it automatically. Each runs in its own folder under runs/ (mp-server, mp-client1, mp-client2), with its console
+// output in console.log there. Closing both clients stops the server; cancelling the build (Ctrl+C) stops everything.
+//
+// Gradle runs a project's tasks one at a time, so the three run tasks can't simply be started together. Instead this
+// task builds everything those run tasks need, then launches each one's java command itself.
+//
+// The loader build sets, before applying this file:
+//   ext.multiplayerServerRun  = 'runMpServer'
+//   ext.multiplayerClientRuns = ['runMpClient1', 'runMpClient2']
+
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.charset.StandardCharsets
+
+def serverPort = 25565
+def rconPort = 25575
+def rconPassword = 'corpserun-dev'
+
+def runTaskNames = [multiplayerServerRun] + multiplayerClientRuns
+
+/** Everything the loader's run task would set up in its own exec(), turned into a ProcessBuilder. */
+def processFor = { JavaExec t ->
+    File workDir
+    Map<String, Object> env = new HashMap<>(t.environment)
+    def cp = null
+    if (t.hasProperty('classpathProvider')) {            // ModDevGradle (NeoForge)
+        workDir = t.gameDirectory.get().asFile
+        env.putAll(t.environmentProperty.get())
+        cp = t.classpathProvider
+    } else {                                             // Loom (Fabric)
+        workDir = new File(t.projectDir.get(), t.internalRunDir.get())
+        env.putAll(t.internalEnvironmentVars.get())
+        if (!t.useArgFile.get()) {
+            cp = t.classpath
+        }
+    }
+    workDir.mkdirs()
+
+    List<String> cmd = [t.javaLauncher.get().executablePath.asFile.absolutePath]
+    if (cp != null) {
+        // The classpath is too long for a Windows command line; pass it in an argument file.
+        File cpFile = new File(t.temporaryDir, "classpath.txt")
+        String escaped = cp.asPath.replace('\\', '\\\\').replace('"', '\\"')
+        cpFile.setText("-classpath \"${escaped}\"", 'UTF-8')
+        cmd << "@${cpFile.absolutePath}".toString()
+    }
+    // jvmArgs(...) goes into the jvmArguments property, which allJvmArgs (system properties, providers) leaves out.
+    cmd.addAll(t.jvmArguments.get())
+    cmd.addAll(t.allJvmArgs)
+    cmd << t.mainClass.get()
+    cmd.addAll(t.args)
+    t.argumentProviders.each { cmd.addAll(it.asArguments()) }
+
+    logger.info("${t.name} in ${workDir}: ${cmd.join(' ')}")
+    def pb = new ProcessBuilder(cmd.collect { it.toString() }).directory(workDir)
+    pb.environment().putAll(env.collectEntries { k, v -> [k.toString(), v.toString()] })
+    pb.redirectErrorStream(true).redirectOutput(new File(workDir, 'console.log'))
+    return [pb, workDir]
+}
+
+def rconStop = { ->
+    def packet = { int id, int type, String body ->
+        byte[] bytes = body.getBytes(StandardCharsets.US_ASCII)
+        ByteBuffer buf = ByteBuffer.allocate(14 + bytes.length).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putInt(10 + bytes.length).putInt(id).putInt(type).put(bytes).put((byte) 0).put((byte) 0)
+        return buf.array()
+    }
+    try (Socket socket = new Socket('127.0.0.1', rconPort)) {
+        socket.soTimeout = 5000
+        def out = socket.outputStream
+        def input = new DataInputStream(socket.inputStream)
+        out.write(packet(1, 3, rconPassword))            // login
+        out.flush()
+        byte[] lengthBytes = new byte[4]
+        input.readFully(lengthBytes)
+        input.skipNBytes(ByteBuffer.wrap(lengthBytes).order(ByteOrder.LITTLE_ENDIAN).getInt())
+        out.write(packet(2, 2, 'stop'))
+        out.flush()
+        return true
+    } catch (IOException ignored) {
+        return false
+    }
+}
+
+def stopProcess = { Process p ->
+    if (p != null && p.alive) {
+        p.descendants().forEach { it.destroy() }
+        p.destroy()
+    }
+}
+
+tasks.register('runMultiplayer') {
+    group = 'multiplayer'
+    description = 'Starts a local dedicated server and two clients (Player1, Player2) that join it.'
+    // Build everything the run tasks depend on (compiled mod, assets, natives, launch configs, ...).
+    dependsOn(provider {
+        runTaskNames.collectMany { name -> def t = tasks.getByName(name); t.taskDependencies.getDependencies(t) as List }
+    })
+
+    doLast {
+        def server = tasks.getByName(multiplayerServerRun) as JavaExec
+        def (serverPb, serverDir) = processFor(server)
+
+        File eula = new File(serverDir, 'eula.txt')
+        if (!eula.exists() || !(eula.text =~ /(?m)^\s*eula\s*=\s*true\s*$/)) {
+            if (!eula.exists()) {
+                eula.text = '# Set to true to accept the Minecraft EULA: https://aka.ms/MinecraftEULA\neula=false\n'
+            }
+            throw new GradleException("Accept the Minecraft EULA (https://aka.ms/MinecraftEULA) by setting eula=true in ${eula}, then run again.")
+        }
+
+        // Offline dev clients need online-mode off; RCON lets this task stop the server cleanly. Bound to
+        // 127.0.0.1 so neither the server nor RCON (with its fixed password) is reachable from other machines.
+        File propsFile = new File(serverDir, 'server.properties')
+        def props = new Properties()
+        if (propsFile.exists()) {
+            propsFile.withReader('UTF-8') { props.load(it) }
+        }
+        props.putAll([
+                'online-mode'     : 'false',
+                'server-ip'       : '127.0.0.1',
+                'server-port'     : serverPort.toString(),
+                'spawn-protection': '0',
+                'enable-rcon'     : 'true',
+                'rcon.port'       : rconPort.toString(),
+                'rcon.password'   : rconPassword,
+        ])
+        propsFile.withWriter('UTF-8') { props.store(it, 'Managed by runMultiplayer for local testing') }
+
+        Process serverProcess = null
+        List<Process> clients = []
+        try {
+            logger.lifecycle("Starting server (log: ${new File(serverDir, 'console.log')})")
+            serverProcess = serverPb.start()
+
+            // Wait until the server accepts connections, so the clients' auto-join doesn't fail.
+            long deadline = System.currentTimeMillis() + 5 * 60 * 1000
+            while (true) {
+                if (!serverProcess.alive) {
+                    throw new GradleException("The server exited early (code ${serverProcess.exitValue()}). See ${new File(serverDir, 'console.log')}")
+                }
+                try (Socket s = new Socket()) {
+                    s.connect(new InetSocketAddress('127.0.0.1', serverPort), 500)
+                    break
+                } catch (IOException ignored) {
+                }
+                if (System.currentTimeMillis() > deadline) {
+                    throw new GradleException('The server did not start within 5 minutes.')
+                }
+                Thread.sleep(1000)
+            }
+            logger.lifecycle('Server is up.')
+
+            multiplayerClientRuns.each { name ->
+                def client = tasks.getByName(name) as JavaExec
+                def (pb, dir) = processFor(client)
+                // First launch in a fresh folder would show the accessibility screen instead of joining. Two windows
+                // side by side also shouldn't pause whenever the other one has focus.
+                File options = new File(dir, 'options.txt')
+                if (!options.exists()) {
+                    options.text = 'onboardAccessibility:false\npauseOnLostFocus:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\n'
+                }
+                logger.lifecycle("Starting ${name} (log: ${new File(dir, 'console.log')})")
+                clients << pb.start()
+            }
+
+            logger.lifecycle('Close both game windows to stop the server.')
+            clients.each { it.waitFor() }
+        } finally {
+            clients.each { stopProcess(it) }
+            if (serverProcess != null && serverProcess.alive) {
+                logger.lifecycle('Stopping server...')
+                if (!rconStop() || !serverProcess.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                    stopProcess(serverProcess)
+                }
+            }
+        }
+    }
+}

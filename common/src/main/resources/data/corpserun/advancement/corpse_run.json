@@ -1,0 +1,25 @@
+{
+  "parent": "minecraft:adventure/root",
+  "display": {
+    "icon": {
+      "id": "corpserun:ghost_icon"
+    },
+    "title": {
+      "translate": "advancements.corpserun.corpse_run.title",
+      "fallback": "Corpse Run"
+    },
+    "description": {
+      "translate": "advancements.corpserun.corpse_run.description",
+      "fallback": "Return to your corpse for the first time"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "resurrected": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

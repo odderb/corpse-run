@@ -1,0 +1,18 @@
+{
+  "effect.corpserun.ghost": "Ghost",
+  "effect.corpserun.invigorated": "Invigorated",
+  "entity.corpserun.corpse": "Corpse",
+  "corpserun.message.in_range": "In range of corpse, %s?",
+  "corpserun.message.howl_hint": "Lost spirits may howl to find their way home.. Press %s to howl.",
+  "corpserun.message.wandered": "Your spirit has wandered quite far.. %s?",
+  "corpserun.message.too_far": "Too far from your corpse to resurrect",
+  "corpserun.message.reset_cooldown": "Wait %ss before using /corpse reset again",
+  "corpserun.command.fix.success": "Resurrected %s where they stand",
+  "corpserun.command.fix.not_ghost": "%s is not a ghost",
+  "corpserun.command.fix.dead": "%s is dead; fix them once they have respawned",
+  "block.corpserun.ethereal_block": "Ethereal Block",
+  "item.corpserun.ghost_icon": "Ghost",
+  "subtitles.corpserun.ghost.call": "Ghost calls",
+  "advancements.corpserun.corpse_run.title": "Corpse Run",
+  "advancements.corpserun.corpse_run.description": "Return to your corpse for the first time"
+}

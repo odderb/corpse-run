@@ -1,0 +1,33 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.corpserun.mixin",
+  "refmap": "${mod_id}.refmap.json",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractArrowMixin",
+    "ArmorStandMixin",
+    "EntityMixin",
+    "ExperienceOrbMixin",
+    "FoodDataMixin",
+    "ItemEntityMixin",
+    "LivingEntityMixin",
+    "MobMixin",
+    "PlayerFoodMixin",
+    "PlayerMixin",
+    "PlayerStepSoundMixin",
+    "ServerPlayerGameModeMixin",
+    "ServerPlayerMixin"
+  ],
+  "client": [
+    "client.GameRendererMixin",
+    "client.LocalPlayerMixin",
+    "client.MinecraftMixin",
+    "client.MultiPlayerGameModeMixin",
+    "client.PlayerRendererMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

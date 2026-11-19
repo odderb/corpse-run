@@ -1,0 +1,26 @@
+{
+  "ghost.call1": {
+    "subtitle": "subtitles.corpserun.ghost.call",
+    "sounds": [
+      "corpserun:ghost/call1"
+    ]
+  },
+  "ghost.call2": {
+    "subtitle": "subtitles.corpserun.ghost.call",
+    "sounds": [
+      "corpserun:ghost/call2"
+    ]
+  },
+  "ghost.call3": {
+    "subtitle": "subtitles.corpserun.ghost.call",
+    "sounds": [
+      "corpserun:ghost/call3"
+    ]
+  },
+  "ghost.call4": {
+    "subtitle": "subtitles.corpserun.ghost.call",
+    "sounds": [
+      "corpserun:ghost/call4"
+    ]
+  }
+}
