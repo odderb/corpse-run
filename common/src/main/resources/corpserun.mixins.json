@@ -21,6 +21,7 @@
   ],
   "client": [
     "client.GameRendererMixin",
+    "client.LightTextureMixin",
     "client.LocalPlayerMixin",
     "client.MinecraftMixin",
     "client.MultiPlayerGameModeMixin",

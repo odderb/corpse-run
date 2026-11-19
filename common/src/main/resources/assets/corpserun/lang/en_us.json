@@ -14,5 +14,13 @@
   "item.corpserun.ghost_icon": "Ghost",
   "subtitles.corpserun.ghost.call": "Ghost calls",
   "advancements.corpserun.corpse_run.title": "Corpse Run",
-  "advancements.corpserun.corpse_run.description": "Return to your corpse for the first time"
+  "advancements.corpserun.corpse_run.description": "Return to your corpse for the first time",
+  "corpserun.config.title": "CorpseRun Settings",
+  "corpserun.config.percent": "%s%%",
+  "corpserun.config.ghostScreenEffect": "Ghost Static",
+  "corpserun.config.ghostScreenEffect.tooltip": "Show full-screen static while you are a ghost",
+  "corpserun.config.ghostHideHud": "Hide HUD as Ghost",
+  "corpserun.config.ghostHideHud.tooltip": "Hide the hotbar, health, armor, hunger, air and XP bars while you are a ghost",
+  "corpserun.config.ghostNightVision": "Ghost Night Vision: %s",
+  "corpserun.config.ghostNightVision.tooltip": "How well you see in the dark while you are a ghost. 100% is as bright as the Night Vision effect"
 }

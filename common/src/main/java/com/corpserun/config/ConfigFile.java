@@ -7,24 +7,29 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 /**
- * One {@code .properties} file in the config folder. An existing file is only ever read, never rewritten: missing or
- * invalid values fall back to their defaults (with a warning for invalid ones). When the file doesn't exist yet, a
- * commented one with every default is written once by {@link #writeDefaultsIfMissing()}.
+ * One {@code .properties} file in the config folder. Missing or invalid values fall back to their defaults (with a
+ * warning for invalid ones). When the file doesn't exist yet, a commented one with every default is written once by
+ * {@link #writeDefaultsIfMissing()}. An existing file is only rewritten by {@link #save()}, for the in-game config
+ * screen.
  */
 final class ConfigFile {
 
     private final Path path;
     private final boolean exists;
     private final Properties props = new Properties();
-    private final StringBuilder defaults;
+    private final String header;
+    /** Every key read so far, in order, with its comment and default: what gets written back. */
+    private final List<Entry> entries = new ArrayList<>();
 
     ConfigFile(String fileName, String header) {
         this.path = Services.PLATFORM.getConfigDir().resolve(fileName);
         this.exists = Files.exists(this.path);
-        this.defaults = new StringBuilder("# ").append(header).append('\n');
+        this.header = header;
         if (this.exists) {
             try (Reader reader = Files.newBufferedReader(this.path)) {
                 this.props.load(reader);
@@ -79,24 +84,50 @@ final class ConfigFile {
         return fallback;
     }
 
+    /** Replaces a value before it's read, as if the file held it. Written out by {@link #save()}. */
+    void set(String key, Object value) {
+        this.props.setProperty(key, String.valueOf(value));
+    }
+
     /** Writes the commented defaults collected by the getters, but only if the file doesn't exist yet. */
     void writeDefaultsIfMissing() {
-        if (this.exists) {
-            return;
+        if (!this.exists) {
+            write(false);
+        }
+    }
+
+    /** Rewrites the file with the current value of every key read so far, each commented with its default. */
+    void save() {
+        write(true);
+    }
+
+    private void write(boolean currentValues) {
+        StringBuilder text = new StringBuilder("# ").append(this.header).append('\n');
+        for (Entry entry : this.entries) {
+            text.append('\n').append("# ").append(entry.comment());
+            String value = entry.fallback();
+            if (currentValues) {
+                text.append(" (default ").append(entry.fallback()).append(')');
+                value = this.props.getProperty(entry.key(), entry.fallback()).trim();
+            }
+            text.append('\n').append(entry.key()).append('=').append(value).append('\n');
         }
         try {
             Files.createDirectories(this.path.getParent());
-            Files.writeString(this.path, this.defaults);
+            Files.writeString(this.path, text);
         } catch (IOException e) {
             Constants.LOG.error("Failed to write {}", this.path, e);
         }
     }
 
     private void addDefault(String key, Object value, String comment) {
-        this.defaults.append('\n').append("# ").append(comment).append('\n').append(key).append('=').append(value).append('\n');
+        this.entries.add(new Entry(key, String.valueOf(value), comment));
     }
 
     private void warnInvalid(String key, String raw, Object fallback) {
         Constants.LOG.warn("Invalid {} '{}' in {}, using {}", key, raw, this.path, fallback);
+    }
+
+    private record Entry(String key, String fallback, String comment) {
     }
 }

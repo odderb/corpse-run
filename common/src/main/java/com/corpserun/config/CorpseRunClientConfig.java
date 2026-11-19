@@ -10,6 +10,7 @@ public final class CorpseRunClientConfig {
 
     private static boolean ghostScreenEffect = true;
     private static boolean ghostHideHud = true;
+    private static float ghostNightVision = 0.5F;
 
     private CorpseRunClientConfig() {
     }
@@ -24,12 +25,44 @@ public final class CorpseRunClientConfig {
         return ghostHideHud;
     }
 
+    /**
+     * How much ghosts see in the dark, from 0 (off) to 1 (as bright as the Night Vision effect). Real Night Vision
+     * still applies at full strength if it's stronger.
+     */
+    public static float ghostNightVision() {
+        return ghostNightVision;
+    }
+
     public static void load() {
-        ConfigFile file = new ConfigFile(FILE_NAME, "CorpseRun client settings");
+        ConfigFile file = open();
+        read(file);
+        file.writeDefaultsIfMissing();
+    }
+
+    /**
+     * Applies new values from the config screen and saves them. They take effect right away: everything reads these
+     * settings each frame.
+     */
+    public static void update(boolean screenEffect, boolean hideHud, float nightVision) {
+        ConfigFile file = open();
+        file.set("ghostScreenEffect", screenEffect);
+        file.set("ghostHideHud", hideHud);
+        file.set("ghostNightVision", nightVision);
+        // Read back through the same parsing as the file, so the values are clamped the same way.
+        read(file);
+        file.save();
+    }
+
+    private static ConfigFile open() {
+        return new ConfigFile(FILE_NAME, "CorpseRun client settings");
+    }
+
+    private static void read(ConfigFile file) {
         ghostScreenEffect = file.getBoolean("ghostScreenEffect", true,
                 "Show full-screen static while you are a ghost");
         ghostHideHud = file.getBoolean("ghostHideHud", true,
                 "Hide the hotbar, health, armor, hunger, air and XP bars while you are a ghost");
-        file.writeDefaultsIfMissing();
+        ghostNightVision = (float) Math.min(1.0, file.getDouble("ghostNightVision", 0.5,
+                "How well you see in the dark while you are a ghost, from 0 (off) to 1 (full Night Vision)"));
     }
 }

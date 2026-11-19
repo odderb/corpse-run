@@ -15,6 +15,9 @@
         ],
         "client": [
             "com.corpserun.CorpseRunFabricClient"
+        ],
+        "modmenu": [
+            "com.corpserun.CorpseRunModMenu"
         ]
     },
     "mixins": [

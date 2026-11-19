@@ -1,0 +1,131 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge Client (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 0
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\clientRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\run",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge Data (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 1
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\dataRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\dataRunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\run",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge MpClient1 (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 2
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpClient1RunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpClient1RunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\runs\\mp-client1",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge MpClient2 (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 3
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpClient2RunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpClient2RunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\runs\\mp-client2",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge MpServer (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 4
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpServerRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\mpServerRunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\runs\\mp-server",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "NeoForge Server (:neoforge)",
+      "presentation": {
+        "group": "Mod Development - neoforge",
+        "order": 5
+      },
+      "projectName": "neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\serverRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dcorpserun%%H:\\ModDev\\neoforge\\CorpseRun\\neoforge\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\neoforge\\run",
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    }
+  ]
+}
