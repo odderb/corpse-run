@@ -8,28 +8,38 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * {@code /resurrect}, {@code /corpse resurrect} and {@code /corpse reset}, which silently do nothing for players who
- * are not ghosts, and the admin-only {@code /corpse fix <player>}.
+ * {@code /resurrect [accept]}, {@code /corpse resurrect [accept]} and {@code /corpse reset}, which silently do nothing
+ * for players who are not ghosts, and the admin-only {@code /corpse fix <player>}.
+ * <p>
+ * Near the corpse, {@code /resurrect} brings the player back with the Invigorated protection. Anywhere else (the
+ * corpse may be out of reach, e.g. on an airship that flew off) it warns first; {@code /resurrect accept} within
+ * {@link #ACCEPT_WINDOW_TICKS} then resurrects them where they stand, unprotected.
  */
 public final class CorpseCommands {
 
     private static final int RESET_COOLDOWN_TICKS = 5 * 20;
+    /** How long {@code /resurrect accept} stays valid after the away-from-corpse warning. */
+    private static final int ACCEPT_WINDOW_TICKS = 10 * 20;
 
     private CorpseCommands() {
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("resurrect")
-                .executes(ctx -> resurrect(ctx.getSource())));
+                .executes(ctx -> resurrect(ctx.getSource(), false))
+                .then(Commands.literal("accept").executes(ctx -> resurrect(ctx.getSource(), true))));
 
         dispatcher.register(Commands.literal("corpse")
-                .then(Commands.literal("resurrect").executes(ctx -> resurrect(ctx.getSource())))
+                .then(Commands.literal("resurrect")
+                        .executes(ctx -> resurrect(ctx.getSource(), false))
+                        .then(Commands.literal("accept").executes(ctx -> resurrect(ctx.getSource(), true))))
                 .then(Commands.literal("reset").executes(ctx -> reset(ctx.getSource())))
                 .then(Commands.literal("fix")
                         .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
@@ -57,24 +67,47 @@ public final class CorpseCommands {
         return 1;
     }
 
-    private static int resurrect(CommandSourceStack source) {
+    /**
+     * @param accept {@code /resurrect accept}: away from the corpse, goes ahead if the warning was given within the
+     *               last {@link #ACCEPT_WINDOW_TICKS}; otherwise it just warns again
+     */
+    private static int resurrect(CommandSourceStack source, boolean accept) {
         ServerPlayer player = source.getPlayer();
         if (player == null || !player.isAlive()) {
             return 0;
         }
-        CorpseLocation corpse = ((GhostData) player).corpserun$getCorpse();
+        GhostData data = (GhostData) player;
+        CorpseLocation corpse = data.corpserun$getCorpse();
         if (corpse == null) {
             return 0;
         }
 
-        if (!GhostManager.isInRange(player, corpse)) {
-            GhostManager.showStatus(player, Component.translatableWithFallback(
-                    "corpserun.message.too_far", "Too far from your corpse to resurrect").withStyle(ChatFormatting.RED));
-            return 0;
+        if (GhostManager.isInRange(player, corpse)) {
+            GhostManager.resurrect(player);
+            return 1;
         }
 
-        GhostManager.resurrect(player);
-        return 1;
+        long now = player.server.getTickCount();
+        long promptUntil = data.corpserun$getResurrectPromptUntil();
+        if (accept && promptUntil != 0L && now <= promptUntil) {
+            GhostManager.resurrectInPlace(player);
+            return 1;
+        }
+
+        data.corpserun$setResurrectPromptUntil(now + ACCEPT_WINDOW_TICKS);
+        player.sendSystemMessage(awayFromCorpseWarning());
+        return 0;
+    }
+
+    private static Component awayFromCorpseWarning() {
+        Component command = Component.literal("/resurrect accept").withStyle(style -> style
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/resurrect accept"))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatableWithFallback(
+                        "corpserun.message.away_from_corpse.hover", "Resurrect here, without protection"))));
+        return Component.translatableWithFallback("corpserun.message.away_from_corpse",
+                "You aren't near your corpse, resurrecting will keep you here, but the spirit world will no longer keep you safe.. %s?",
+                command).withStyle(ChatFormatting.YELLOW);
     }
 
     private static int reset(CommandSourceStack source) {
@@ -94,10 +127,13 @@ public final class CorpseCommands {
             return 0;
         }
 
-        // keepInventory=true here only means "don't consume a respawn anchor charge".
-        DimensionTransition target = player.findRespawnPositionAndUseSpawnBlock(true, DimensionTransition.DO_NOTHING);
+        CorpseLocation corpse = data.corpserun$getCorpse();
+        if (corpse == null) {
+            return 0;
+        }
+        GhostManager.ResetTarget target = GhostManager.resetTarget(player, corpse);
         Vec3 pos = target.pos();
-        player.teleportTo(target.newLevel(), pos.x, pos.y, pos.z, target.yRot(), target.xRot());
+        player.teleportTo(target.level(), pos.x, pos.y, pos.z, target.yRot(), target.xRot());
         player.resetFallDistance();
         data.corpserun$setLastReset(now);
         return 1;

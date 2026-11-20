@@ -23,6 +23,24 @@ public interface GhostData {
 
     void corpserun$setLastReset(long tick);
 
+    /**
+     * Server tick until which {@code /resurrect accept} resurrects this ghost away from their corpse, or 0 if no
+     * such prompt is open. Not persisted.
+     */
+    long corpserun$getResurrectPromptUntil();
+
+    void corpserun$setResurrectPromptUntil(long tick);
+
+    /** Real time (epoch millis) the howl hint was last shown, or 0 if never. Saved. */
+    long corpserun$getLastHowlHint();
+
+    void corpserun$setLastHowlHint(long millis);
+
+    /** Whether the first-time ghost message has been shown to this player. Saved. */
+    boolean corpserun$hasSeenIntro();
+
+    void corpserun$setSeenIntro(boolean seen);
+
     /** Everywhere the living player has walked this life (saved); frozen into the corpse location on death. */
     TrailStack corpserun$getTrail();
 

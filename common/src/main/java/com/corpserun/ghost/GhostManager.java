@@ -3,6 +3,7 @@ package com.corpserun.ghost;
 import com.corpserun.Constants;
 import com.corpserun.CorpseRun;
 import com.corpserun.block.EtherealBlocks;
+import com.corpserun.compat.SubLevels;
 import com.corpserun.config.CorpseRunConfig;
 import com.corpserun.entity.CorpseEntity;
 import net.minecraft.ChatFormatting;
@@ -21,13 +22,16 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,11 +46,12 @@ public final class GhostManager {
      * a ghost, or logging back in as one), so a ghost who relogs gets the reminder again.
      */
     private static final int HOWL_HINT_DELAY_TICKS = 15 * 20;
+    /** The howl hint is shown at most once per this much real time (saved, so relogs and restarts don't reset it). */
+    private static final long HOWL_HINT_COOLDOWN_MILLIS = 4L * 60L * 60L * 1000L;
     private static final int TRAIL_RECORD_INTERVAL = 5;
 
     private static final int HUM_INTERVAL = 80;
     private static final ResourceLocation SPEED_MODIFIER = Constants.id("ghost_speed");
-    private static final ResourceLocation KNOCKBACK_MODIFIER = Constants.id("resurrect_knockback");
     /** Granted by code on the first resurrect; its only criterion is minecraft:impossible. */
     private static final ResourceLocation CORPSE_RUN_ADVANCEMENT = Constants.id("corpse_run");
     /** Knockback every melee hit gets regardless of the attribute (LivingEntity#hurt). */
@@ -83,17 +88,26 @@ public final class GhostManager {
             level = player.serverLevel();
             ground = new GroundPos(level.dimension(), player.position());
         }
+        // Last stood on an airship (Sable sub-level): the body stays on it, wherever it has flown since.
+        Vec3 plotPos = ground.plotPos();
+        Vec3 pos = ground.pos();
+        if (plotPos != null) {
+            Vec3 now = SubLevels.toWorld(level, plotPos);
+            if (now != null) {
+                pos = now;
+            }
+        }
         // The spot may be far behind (an elytra flight, a long fall): make sure its chunk is loaded for the corpse.
-        BlockPos corpsePos = BlockPos.containing(ground.pos());
+        BlockPos corpsePos = BlockPos.containing(pos);
         level.getChunk(corpsePos);
-        CorpseEntity corpse = CorpseEntity.create(level, player, ground.pos());
+        CorpseEntity corpse = CorpseEntity.create(level, player, pos, plotPos, SubLevels.toPlotYaw(player, player.getYRot()));
         level.addFreshEntity(corpse);
         // Freeze everywhere this life walked, ending at the body; the next life records from scratch.
         TrailStack trail = data(player).corpserun$getTrail().copy();
         trail.append(level.dimension(), corpsePos);
         data(player).corpserun$getTrail().clear();
 
-        data(player).corpserun$setCorpse(new CorpseLocation(corpse.getUUID(), level.dimension(), ground.pos(), trail));
+        data(player).corpserun$setCorpse(new CorpseLocation(corpse.getUUID(), level.dimension(), pos, plotPos, trail));
         data(player).corpserun$setInRange(false);
     }
 
@@ -115,7 +129,8 @@ public final class GhostManager {
 
     /**
      * Remembers where a living player last stood on the ground. Riding counts when the vehicle is on the ground
-     * (the vehicle's position is used, so the body isn't left hanging at saddle height).
+     * (the vehicle's position is used, so the body isn't left hanging at saddle height). On a Sable sub-level the
+     * spot is also kept in plot coordinates, so the corpse is laid on the airship rather than in the air where it was.
      */
     private static void recordGround(ServerPlayer player) {
         if (player.isSpectator()) {
@@ -129,7 +144,7 @@ public final class GhostManager {
         Vec3 pos = standing.position();
         ResourceKey<Level> dimension = player.level().dimension();
         if (last == null || !last.pos().equals(pos) || !last.dimension().equals(dimension)) {
-            data(player).corpserun$setLastGround(new GroundPos(dimension, pos));
+            data(player).corpserun$setLastGround(new GroundPos(dimension, pos, SubLevels.toPlot(standing)));
         }
     }
 
@@ -138,6 +153,8 @@ public final class GhostManager {
         data(oldPlayer).corpserun$getGuide().reset();
         data(newPlayer).corpserun$setCorpse(data(oldPlayer).corpserun$getCorpse());
         data(newPlayer).corpserun$setLastReset(data(oldPlayer).corpserun$getLastReset());
+        data(newPlayer).corpserun$setLastHowlHint(data(oldPlayer).corpserun$getLastHowlHint());
+        data(newPlayer).corpserun$setSeenIntro(data(oldPlayer).corpserun$hasSeenIntro());
         data(newPlayer).corpserun$getTrail().copyFrom(data(oldPlayer).corpserun$getTrail());
         data(newPlayer).corpserun$getEtherealBlocks().addAll(data(oldPlayer).corpserun$getEtherealBlocks());
         // Only still set when the player wasn't killed (End exit); onDeath clears it once the corpse is placed.
@@ -160,6 +177,10 @@ public final class GhostManager {
                     // Milk or /effect clear removed the icon; protection still runs, so show it again.
                     showInvigorated(player, (int) remaining);
                 }
+            } else if (player.hasEffect(CorpseRun.INVIGORATED)) {
+                // The effect is saved with the player but the protection isn't (relog or restart mid-protection):
+                // drop the icon rather than show protection that no longer applies.
+                player.removeEffect(CorpseRun.INVIGORATED);
             }
             recordGround(player);
             if (player.tickCount % TRAIL_RECORD_INTERVAL == 0) {
@@ -168,12 +189,26 @@ public final class GhostManager {
             return;
         }
 
+        corpse = followSubLevel(player, corpse);
         enforceGhostState(player);
         GhostCall.tick(player);
+        if (!data.corpserun$hasSeenIntro()) {
+            // First time ever in ghost form (saved, so once per player).
+            player.sendSystemMessage(introMessage());
+            data.corpserun$setSeenIntro(true);
+        }
 
-        data.corpserun$getGuide().tick(player, corpse, GhostCall.isHowling(player));
+        boolean showFootprints = !CorpseRunConfig.footprintsOnlyWhenHowling() || GhostCall.isHowling(player);
+        data.corpserun$getGuide().tick(player, corpse, showFootprints);
+        highlightCorpse(player, corpse, GhostCall.isCorpseHighlighted(player));
         if (player.tickCount == HOWL_HINT_DELAY_TICKS) {
-            player.sendSystemMessage(howlHint());
+            long now = System.currentTimeMillis();
+            long last = data.corpserun$getLastHowlHint();
+            // A last time in the future (clock changed) also counts as due.
+            if (last == 0L || now - last >= HOWL_HINT_COOLDOWN_MILLIS || now < last) {
+                player.sendSystemMessage(howlHint());
+                data.corpserun$setLastHowlHint(now);
+            }
         }
 
         boolean sameDimension = player.level().dimension().equals(corpse.dimension());
@@ -195,25 +230,89 @@ public final class GhostManager {
         } else if (player.tickCount % IN_RANGE_REFRESH_INTERVAL == 0) {
             if (inRange) {
                 showStatus(player, inRangeMessage());
-            } else if (hasWandered(player, corpse)) {
-                showStatus(player, wanderedMessage());
+            } else {
+                double wandered = wanderedDistance(player, corpse);
+                if (wandered >= 0.0) {
+                    showStatus(player, wanderedMessage(wandered));
+                }
             }
         }
     }
 
     /**
-     * Too far from every point of the trail back in this dimension (or there is none here), so the footprints can't
-     * really help any more. Measured against the recorded trail, not the footprint route, since the route is
-     * re-planned from wherever the ghost is.
+     * A corpse on a Sable sub-level moves with it: keeps the location's world position (range checks, hum,
+     * footprints) where the sub-level has carried it. While the sub-level isn't loaded, its last known spot is used.
      */
-    private static boolean hasWandered(ServerPlayer player, CorpseLocation corpse) {
+    private static CorpseLocation followSubLevel(ServerPlayer player, CorpseLocation corpse) {
+        if (corpse.plotPos() == null) {
+            return corpse;
+        }
+        ServerLevel level = player.server.getLevel(corpse.dimension());
+        Vec3 now = level == null ? null : SubLevels.toWorld(level, corpse.plotPos());
+        if (now == null || now.equals(corpse.pos())) {
+            return corpse;
+        }
+        CorpseLocation moved = corpse.withPos(now);
+        data(player).corpserun$setCorpse(moved);
+        return moved;
+    }
+
+    /**
+     * Makes the corpse glow for its ghost after a howl (GhostCall#isCorpseHighlighted, CorpseEntity#isCurrentlyGlowing).
+     * Only reaches the entity while its chunk is loaded; a corpse loaded mid-glow picks it up on the next tick, and a
+     * ghost who logs out mid-glow leaves it set, which shows to nobody until they're back and it's cleared.
+     */
+    private static void highlightCorpse(ServerPlayer player, CorpseLocation corpse, boolean highlighted) {
+        ServerLevel level = player.server.getLevel(corpse.dimension());
+        if (level != null && level.getEntity(corpse.corpseId()) instanceof CorpseEntity entity) {
+            entity.setHighlighted(highlighted);
+        }
+    }
+
+    /**
+     * How far the ghost is from the nearest point of the trail back in this dimension, if that's beyond
+     * wanderDistance, so the footprints can't really help any more; {@link Double#POSITIVE_INFINITY} if there is no
+     * trail here at all; -1 if it hasn't wandered. Measured against the recorded trail, not the footprint route, since
+     * the route is re-planned from wherever the ghost is.
+     */
+    private static double wanderedDistance(ServerPlayer player, CorpseLocation corpse) {
         double limit = CorpseRunConfig.wanderDistance();
         if (limit <= 0.0) {
-            return false;
+            return -1.0;
         }
         TrailSegment segment = corpse.trail().topFor(player.level().dimension());
-        return segment == null || segment.isEmpty() || segment.distSqrToClosest(player.blockPosition()) > limit * limit;
+        if (segment == null || segment.isEmpty()) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double distSqr = segment.distSqrToClosest(player.blockPosition());
+        return distSqr > limit * limit ? Math.sqrt(distSqr) : -1.0;
     }
+
+    /**
+     * Where /corpse reset sends a ghost: the earliest point still recorded on the trail its corpse holds, or its
+     * spawn point, whichever is closer to where the ghost is now. One in the ghost's dimension beats one that isn't;
+     * if neither is, the trail's start wins, since the footprints lead on from there. The spawn point is also the
+     * fallback with no trail at all.
+     */
+    public static ResetTarget resetTarget(ServerPlayer player, CorpseLocation corpse) {
+        // keepInventory=true here only means "don't consume a respawn anchor charge".
+        DimensionTransition spawn = player.findRespawnPositionAndUseSpawnBlock(true, DimensionTransition.DO_NOTHING);
+        ResetTarget spawnTarget = new ResetTarget(spawn.newLevel(), spawn.pos(), spawn.yRot(), spawn.xRot());
+
+        TrailSegment earliest = corpse.trail().earliest();
+        ServerLevel trailLevel = earliest == null ? null : player.server.getLevel(earliest.dimension());
+        if (trailLevel == null) {
+            return spawnTarget;
+        }
+        ResetTarget trailTarget = new ResetTarget(trailLevel, Vec3.atBottomCenterOf(earliest.first()), player.getYRot(), player.getXRot());
+        return distanceFrom(player, trailTarget) <= distanceFrom(player, spawnTarget) ? trailTarget : spawnTarget;
+    }
+
+    private static double distanceFrom(ServerPlayer player, ResetTarget target) {
+        return target.level() == player.level() ? target.pos().distanceTo(player.position()) : Double.MAX_VALUE;
+    }
+
+    public record ResetTarget(ServerLevel level, Vec3 pos, float yRot, float xRot) {}
 
     /** Keeps the visible effect and the no-build ability in place (milk, /effect clear, gamemode changes...). */
     private static void enforceGhostState(ServerPlayer player) {
@@ -276,7 +375,15 @@ public final class GhostManager {
 
     /** Ends ghost form: removes the corpse (if loaded) and the effect, and restores normal abilities. */
     public static void resurrect(ServerPlayer player) {
-        resurrect(player, true);
+        resurrect(player, true, true);
+    }
+
+    /**
+     * Gives up on the corpse ({@code /resurrect accept} away from it): resurrects the ghost where they stand, but
+     * without the Invigorated protection a real corpse run earns, and without the advancement.
+     */
+    public static void resurrectInPlace(ServerPlayer player) {
+        resurrect(player, false, false);
     }
 
     /**
@@ -289,11 +396,11 @@ public final class GhostManager {
         if (!isGhost(player)) {
             return false;
         }
-        resurrect(player, false);
+        resurrect(player, false, true);
         return true;
     }
 
-    private static void resurrect(ServerPlayer player, boolean awardAdvancement) {
+    private static void resurrect(ServerPlayer player, boolean awardAdvancement, boolean protect) {
         GhostData data = data(player);
         CorpseLocation corpse = data.corpserun$getCorpse();
         if (corpse == null) {
@@ -330,7 +437,10 @@ public final class GhostManager {
         player.gameMode.getGameModeForPlayer().updatePlayerAbilities(player.getAbilities());
         player.onUpdateAbilities();
 
-        startProtection(player);
+        data.corpserun$setResurrectPromptUntil(0L);
+        if (protect) {
+            startProtection(player);
+        }
         if (awardAdvancement) {
             awardCorpseRun(player);
         }
@@ -344,9 +454,8 @@ public final class GhostManager {
     }
 
     /**
-     * A few seconds of invulnerability with extra knockback on the player's hits, to escape whatever killed them.
-     * Player hit knockback is BASE_HIT_KNOCKBACK plus half the ATTACK_KNOCKBACK attribute, so adding
-     * (multiplier - 1) * BASE / 0.5 makes a normal hit exactly the configured percentage (sprint hits a bit less).
+     * A few seconds of invulnerability, with extra knockback on the player's hits and whatever they hit slowed, to
+     * escape whatever killed them.
      */
     private static void startProtection(ServerPlayer player) {
         int ticks = (int) Math.round(CorpseRunConfig.resurrectProtectionSeconds() * 20.0);
@@ -355,12 +464,41 @@ public final class GhostManager {
         }
         data(player).corpserun$setProtectedUntil(player.server.getTickCount() + ticks);
         showInvigorated(player, ticks);
+    }
 
-        double extra = (CorpseRunConfig.resurrectKnockbackPercent() / 100.0 - 1.0) * BASE_HIT_KNOCKBACK / 0.5;
-        AttributeInstance knockback = player.getAttribute(Attributes.ATTACK_KNOCKBACK);
-        if (knockback != null && extra > 0.0) {
-            knockback.addOrUpdateTransientModifier(new AttributeModifier(KNOCKBACK_MODIFIER, extra, AttributeModifier.Operation.ADD_VALUE));
+    /**
+     * Knockback added to the player's hits while Invigorated (LivingEntityMixin, on LivingEntity#getKnockback), or 0.
+     * Hit knockback is BASE_HIT_KNOCKBACK plus half of getKnockback, so adding (multiplier - 1) * BASE / 0.5 makes a
+     * normal hit exactly the configured percentage (sprint hits a bit less). Added there rather than as an
+     * ATTACK_KNOCKBACK modifier, since that attribute is capped at 5 (about 725%).
+     */
+    public static float invigoratedKnockbackBonus(ServerPlayer player) {
+        if (!isInvigorated(player)) {
+            return 0.0F;
         }
+        double extra = (CorpseRunConfig.resurrectKnockbackPercent() / 100.0 - 1.0) * BASE_HIT_KNOCKBACK / 0.5;
+        return (float) Math.max(0.0, extra);
+    }
+
+    /** Slowness III: 15% per level, so 45% slower. */
+    private static final int HIT_SLOWNESS_AMPLIFIER = 2;
+
+    /**
+     * An Invigorated player's melee hit landed on {@code target} (LivingEntityMixin): vanilla Slowness III (45% slower)
+     * for {@code resurrectHitSlowSeconds}. Each hit starts that over; a stronger or longer Slowness already on the
+     * target is kept, as vanilla does.
+     */
+    public static void onInvigoratedHit(ServerPlayer player, LivingEntity target) {
+        int ticks = (int) Math.round(CorpseRunConfig.resurrectHitSlowSeconds() * 20.0);
+        if (ticks > 0 && isInvigorated(player)) {
+            target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, ticks, HIT_SLOWNESS_AMPLIFIER), player);
+        }
+    }
+
+    /** In the post-resurrect protection window. */
+    private static boolean isInvigorated(ServerPlayer player) {
+        long protectedUntil = data(player).corpserun$getProtectedUntil();
+        return protectedUntil != 0L && player.server.getTickCount() < protectedUntil;
     }
 
     /** The "Invigorated" icon, counting down the protection. No particles, so it's just the HUD/inventory icon. */
@@ -371,10 +509,6 @@ public final class GhostManager {
     private static void endProtection(ServerPlayer player) {
         data(player).corpserun$setProtectedUntil(0L);
         player.removeEffect(CorpseRun.INVIGORATED);
-        AttributeInstance knockback = player.getAttribute(Attributes.ATTACK_KNOCKBACK);
-        if (knockback != null) {
-            knockback.removeModifier(KNOCKBACK_MODIFIER);
-        }
     }
 
     /**
@@ -397,6 +531,13 @@ public final class GhostManager {
         return Component.translatableWithFallback("corpserun.message.in_range", "In range of corpse, %s?", command);
     }
 
+    private static Component introMessage() {
+        Component command = Component.literal("/resurrect").withStyle(ChatFormatting.GREEN);
+        return Component.translatableWithFallback("corpserun.message.intro",
+                "You are now spirit walking, the spirit realm is safe and will guide you to your corpse. Use %s when you're ready.",
+                command).withStyle(ChatFormatting.GRAY);
+    }
+
     /** The chat hint; the key is shown as whatever the player has attack bound to (left click by default). */
     private static Component howlHint() {
         Component key = Component.keybind("key.attack").withStyle(ChatFormatting.GREEN);
@@ -404,8 +545,15 @@ public final class GhostManager {
                 "Lost spirits may howl to find their way home.. Press %s to howl.", key).withStyle(ChatFormatting.GRAY);
     }
 
-    private static Component wanderedMessage() {
+    /** @param distance blocks from the trail back, or infinite if there's none in this dimension */
+    private static Component wanderedMessage(double distance) {
         Component command = Component.literal("/corpse reset").withStyle(ChatFormatting.GREEN);
-        return Component.translatableWithFallback("corpserun.message.wandered", "Your spirit has wandered quite far.. %s?", command);
+        if (Double.isInfinite(distance)) {
+            return Component.translatableWithFallback("corpserun.message.wandered_elsewhere",
+                    "Your spirit has wandered quite far, your path doesn't pass through here.. %s?", command);
+        }
+        Component blocks = Component.literal(Long.toString(Math.round(distance))).withStyle(ChatFormatting.YELLOW);
+        return Component.translatableWithFallback("corpserun.message.wandered",
+                "Your spirit has wandered quite far, %s blocks from your path.. %s?", blocks, command);
     }
 }

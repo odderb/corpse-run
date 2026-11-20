@@ -11,6 +11,7 @@
     "ExperienceOrbMixin",
     "FoodDataMixin",
     "ItemEntityMixin",
+    "LiquidBlockMixin",
     "LivingEntityMixin",
     "MobMixin",
     "PlayerFoodMixin",

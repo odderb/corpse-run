@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -33,8 +34,8 @@ public abstract class LivingEntityMixin {
     }
 
     /**
-     * Ghosts walk on water and lava like Striders on lava: vanilla's fluid collision then treats the surface of a
-     * still (source) block of either as solid. Flowing fluid stays swimmable. Sneaking drops the ghost in to swim;
+     * Ghosts walk on water and lava: a still (source) block of either is then a full solid block under them (see
+     * LiquidBlockMixin). Flowing fluid stays swimmable. Sneaking drops the ghost in to swim;
      * this is read at every collision check, so it takes effect as soon as shift is held. Ghosts are fire immune
      * (EntityMixin), so lava never burns them.
      * <p>
@@ -47,6 +48,25 @@ public abstract class LivingEntityMixin {
         TagKey<Fluid> tag = GhostManager.walkableFluid(fluid);
         if (tag != null && GhostManager.isGhost(self) && !self.isDescending() && !self.isEyeInFluid(tag)) {
             cir.setReturnValue(true);
+        }
+    }
+
+    /**
+     * Invigorated players' melee hits knock harder and slow what they hit (GhostManager#invigoratedKnockbackBonus,
+     * #onInvigoratedHit). Player#attack only asks for the knockback once a hit has landed (sweep hits too), so this
+     * is also where a hit is known to have landed.
+     */
+    @Inject(method = "getKnockback", at = @At("RETURN"), cancellable = true)
+    private void corpserun$invigoratedHit(Entity target, DamageSource source, CallbackInfoReturnable<Float> cir) {
+        if (!((Object) this instanceof ServerPlayer player)) {
+            return;
+        }
+        float bonus = GhostManager.invigoratedKnockbackBonus(player);
+        if (bonus > 0.0F) {
+            cir.setReturnValue(cir.getReturnValueF() + bonus);
+        }
+        if (target instanceof LivingEntity living) {
+            GhostManager.onInvigoratedHit(player, living);
         }
     }
 

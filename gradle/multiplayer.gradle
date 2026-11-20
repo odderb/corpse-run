@@ -10,9 +10,13 @@
 // The loader build sets, before applying this file:
 //   ext.multiplayerServerRun  = 'runMpServer'
 //   ext.multiplayerClientRuns = ['runMpClient1', 'runMpClient2']
+//   ext.multiplayerPlayers    = ['Player1', 'Player2']   (the clients' usernames; all made operators)
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+
 import java.nio.charset.StandardCharsets
 
 def serverPort = 25565
@@ -129,6 +133,17 @@ tasks.register('runMultiplayer') {
                 'rcon.password'   : rconPassword,
         ])
         propsFile.withWriter('UTF-8') { props.store(it, 'Managed by runMultiplayer for local testing') }
+
+        // Every test player is an operator (level 4). Offline-mode servers give players the UUID of
+        // "OfflinePlayer:<name>". Other entries already in ops.json are kept.
+        File opsFile = new File(serverDir, 'ops.json')
+        List ops = opsFile.exists() ? (new JsonSlurper().parse(opsFile, 'UTF-8') as List) : []
+        multiplayerPlayers.each { String name ->
+            String uuid = UUID.nameUUIDFromBytes("OfflinePlayer:${name}".getBytes(StandardCharsets.UTF_8)).toString()
+            ops.removeIf { it.uuid == uuid || it.name == name }
+            ops << [uuid: uuid, name: name, level: 4, bypassesPlayerLimit: false]
+        }
+        opsFile.setText(JsonOutput.prettyPrint(JsonOutput.toJson(ops)), 'UTF-8')
 
         Process serverProcess = null
         List<Process> clients = []

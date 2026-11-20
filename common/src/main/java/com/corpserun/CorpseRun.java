@@ -79,7 +79,9 @@ public final class CorpseRun {
         return EntityType.Builder.<CorpseEntity>of(CorpseEntity::new, MobCategory.MISC)
                 .sized(0.9F, 0.35F)
                 .clientTrackingRange(10)
-                .updateInterval(20)
+                // Every tick, so a corpse riding an airship (Sable sub-level) keeps up with it. Corpses that
+                // lie still send next to nothing, since only changed positions are sent.
+                .updateInterval(1)
                 .fireImmune()
                 .build(Constants.id("corpse").toString());
     }

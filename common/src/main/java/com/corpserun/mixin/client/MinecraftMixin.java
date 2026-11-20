@@ -35,7 +35,10 @@ public abstract class MinecraftMixin {
             return;
         }
         cir.setReturnValue(false);
-        if (this.player.tickCount >= this.corpserun$nextCallTick) {
+        // The cooldown is in the local player's ticks, but a new LocalPlayer (respawn, dimension change, joining a
+        // world) starts again from 0: a cooldown further ahead than one throttle period is left over from an old one.
+        int wait = this.corpserun$nextCallTick - this.player.tickCount;
+        if (wait <= 0 || wait > GhostCall.CLIENT_THROTTLE_TICKS) {
             this.corpserun$nextCallTick = this.player.tickCount + GhostCall.CLIENT_THROTTLE_TICKS;
             Services.PLATFORM.sendToServer(GhostCallPayload.INSTANCE);
         }

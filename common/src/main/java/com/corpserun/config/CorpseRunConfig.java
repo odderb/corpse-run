@@ -10,13 +10,15 @@ public final class CorpseRunConfig {
 
     private static double resurrectRange = 10.0;
     private static boolean footprints = true;
+    private static boolean footprintsOnlyWhenHowling = false;
     private static boolean corpseHum = true;
     private static double humRange = 48.0;
     private static double ghostSpeedPercent = 150.0;
     private static int trailMaxPoints = 4096;
     private static double guidanceLookahead = 24.0;
     private static double resurrectProtectionSeconds = 10.0;
-    private static double resurrectKnockbackPercent = 300.0;
+    private static double resurrectKnockbackPercent = 1000.0;
+    private static double resurrectHitSlowSeconds = 3.0;
     private static int etherealBlockLimit = 3;
     private static double wanderDistance = 64.0;
     private static boolean ghostsVisibleToLiving = false;
@@ -31,6 +33,10 @@ public final class CorpseRunConfig {
 
     public static boolean footprints() {
         return footprints;
+    }
+
+    public static boolean footprintsOnlyWhenHowling() {
+        return footprintsOnlyWhenHowling;
     }
 
     public static boolean corpseHum() {
@@ -62,6 +68,10 @@ public final class CorpseRunConfig {
         return resurrectKnockbackPercent;
     }
 
+    public static double resurrectHitSlowSeconds() {
+        return resurrectHitSlowSeconds;
+    }
+
     public static int etherealBlockLimit() {
         return etherealBlockLimit;
     }
@@ -80,6 +90,8 @@ public final class CorpseRunConfig {
                 "Distance in blocks from your corpse within which you can /resurrect");
         footprints = file.getBoolean("footprints", true,
                 "Ghosts see footprints guiding them back along the path they walked before dying");
+        footprintsOnlyWhenHowling = file.getBoolean("footprintsOnlyWhenHowling", false,
+                "Footprints only appear while the ghost howls; otherwise they keep repeating");
         trailMaxPoints = file.getInt("trailMaxPoints", 4096, 2,
                 "Recorded path points (about 2 blocks apart) kept per life, oldest dropped first");
         guidanceLookahead = file.getDouble("guidanceLookahead", 24.0,
@@ -92,8 +104,10 @@ public final class CorpseRunConfig {
                 "Ghost walking speed as a percentage of normal, e.g. 150 = 1.5x");
         resurrectProtectionSeconds = file.getDouble("resurrectProtectionSeconds", 10.0,
                 "Seconds of invulnerability after /resurrect");
-        resurrectKnockbackPercent = file.getDouble("resurrectKnockbackPercent", 300.0,
+        resurrectKnockbackPercent = file.getDouble("resurrectKnockbackPercent", 1000.0,
                 "Knockback of your hits during that protection, as a percentage of normal");
+        resurrectHitSlowSeconds = file.getDouble("resurrectHitSlowSeconds", 3.0,
+                "Seconds of Slowness III (45% slower) on whatever you hit during that protection; 0 disables");
         etherealBlockLimit = file.getInt("etherealBlockLimit", 3, 0,
                 "How many ethereal blocks a ghost can have at once; placing another removes the oldest, 0 disables");
         ghostsVisibleToLiving = file.getBoolean("ghostsVisibleToLiving", false,

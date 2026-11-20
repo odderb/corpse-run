@@ -59,6 +59,45 @@ neoForge {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter { includeGroup('maven.modrinth') }
+    }
+    maven {
+        name = 'CreateMod'
+        url = 'https://maven.createmod.net'
+    }
+}
+
+// Mods only present in dev runs (runClient, runServer, runMultiplayer), not dependencies of the published mod.
+configurations {
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    // Sable sub-levels (Create Aeronautics). Jar-in-jar; Sable ships its own copy and the newest one wins.
+    jarJar(implementation("dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:[${sable_companion_version},)")) {
+        version { prefer(sable_companion_version) }
+    }
+
+    // Create Aeronautics (on Sable) in dev runs, to test corpses on airships. dev_aeronautics=false leaves them out,
+    // to test without Sable.
+    if (dev_aeronautics.toBoolean()) {
+        localRuntime "maven.modrinth:sable:${sable_mod_version}+mc${minecraft_version}"
+        localRuntime "maven.modrinth:create:${create_mod_version}+mc${minecraft_version}"
+        localRuntime "maven.modrinth:create-aeronautics:${create_aeronautics_version}+mc${minecraft_version}"
+    }
+}
+
 ext.multiplayerServerRun = 'runMpServer'
 ext.multiplayerClientRuns = ['runMpClient1', 'runMpClient2']
+// The clients' --username values; all of them are made operators on the test server.
+ext.multiplayerPlayers = ['Player1', 'Player2']
 apply from: rootProject.file('gradle/multiplayer.gradle')

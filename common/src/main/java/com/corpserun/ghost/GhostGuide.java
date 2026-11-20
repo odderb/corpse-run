@@ -20,9 +20,14 @@ import java.util.List;
 
 /**
  * Per-ghost footprint guidance (not saved). In the ghost's current dimension it takes the top-most trail
- * segment, pathfinds from the ghost to the closest point on it, and shows footprints along
+ * segment, pathfinds from the ghost to a point on it near the ghost, and shows footprints along
  * [path] + [rest of that run], which ends at the corpse or at the portal the player left through. At the end of a
  * run (a teleport/elytra gap follows) it pathfinds on to the start of the next run.
+ * <p>
+ * The point joined is the one furthest along the trail among those about as near as the nearest (see
+ * {@link #TRAIL_JOIN_SLACK}), not simply the nearest: the nearest is often just behind the ghost, and the trail
+ * replays everywhere the last life went, so it can pass the same spot several times. Joining the latest pass skips
+ * the loops in between instead of leading the ghost back along them.
  */
 public final class GhostGuide {
 
@@ -35,6 +40,14 @@ public final class GhostGuide {
     private static final double OFF_ROUTE_DISTANCE_SQR = 3.0 * 3.0;
     /** Within this of a run's last point counts as having finished it. */
     private static final double RUN_END_DISTANCE_SQR = 3.0 * 3.0;
+    /**
+     * Trail points up to this much further away than the nearest one still count as near; the latest of those is
+     * joined. Wide enough to skip a point just behind the ghost or a trail loop passing close by, small enough not
+     * to aim for a pass of the trail that is really somewhere else.
+     */
+    private static final double TRAIL_JOIN_SLACK = 4.0;
+    /** The same for where a sweep of footprints starts on the route: it starts at the latest nearby route point. */
+    private static final double SWEEP_START_SLACK = 2.0;
     /** Closer than this to the target needs no pathfinding. */
     private static final double ON_TRAIL_DISTANCE_SQR = 2.0 * 2.0;
     /** Within this of the corpse, footprints stop: the ghost is standing on it. */
@@ -68,10 +81,10 @@ public final class GhostGuide {
     private record Footprint(Vec3 heel, Vec3 toe, Vec3 drift) {}
 
     /**
-     * @param howling          the ghost is howling (GhostCall): footprints are only shown then. A sweep already on
-     *                         its way finishes after the howl ends; no new one starts.
+     * @param showFootprints   new sweeps may start: always, or only while howling (footprintsOnlyWhenHowling). A
+     *                         sweep already on its way finishes after this turns false; no new one starts.
      */
-    public void tick(ServerPlayer player, CorpseLocation corpse, boolean howling) {
+    public void tick(ServerPlayer player, CorpseLocation corpse, boolean showFootprints) {
         if (!CorpseRunConfig.footprints()) {
             reset();
             return;
@@ -95,7 +108,7 @@ public final class GhostGuide {
         }
         // The route keeps being planned in the background, so footprints appear right away on a howl.
         if (player.tickCount % STEP_INTERVAL == 0) {
-            stepSweep(player, howling);
+            stepSweep(player, showFootprints);
         }
     }
 
@@ -137,18 +150,27 @@ public final class GhostGuide {
         BlockPos feet = player.blockPosition();
         List<List<BlockPos>> runs = segment.runs();
 
-        // Closest trail point to the ghost.
+        // Nearest trail point to the ghost...
+        double nearest = Double.MAX_VALUE;
+        for (List<BlockPos> run : runs) {
+            for (BlockPos pos : run) {
+                nearest = Math.min(nearest, pos.distSqr(feet));
+            }
+        }
+        // ...then the latest point (runs in order, points in order) about as near, so the ghost is never led back.
+        double reach = Math.sqrt(nearest) + TRAIL_JOIN_SLACK;
+        double reachSqr = reach * reach;
         int runIndex = 0;
         int pointIndex = 0;
-        double bestDist = Double.MAX_VALUE;
+        double bestDist = nearest;
         for (int r = 0; r < runs.size(); r++) {
             List<BlockPos> run = runs.get(r);
             for (int p = 0; p < run.size(); p++) {
                 double d = run.get(p).distSqr(feet);
-                if (d < bestDist) {
-                    bestDist = d;
+                if (d <= reachSqr) {
                     runIndex = r;
                     pointIndex = p;
+                    bestDist = d;
                 }
             }
         }
@@ -231,13 +253,17 @@ public final class GhostGuide {
         if (this.route.isEmpty()) {
             return List.of();
         }
+        // From the latest route point about as near as the nearest, so a route that doubles back past the ghost
+        // doesn't send the footprints around the loop (or a step behind it first).
         BlockPos feet = player.blockPosition();
+        double nearest = Double.MAX_VALUE;
+        for (BlockPos pos : this.route) {
+            nearest = Math.min(nearest, pos.distSqr(feet));
+        }
+        double reach = Math.sqrt(nearest) + SWEEP_START_SLACK;
         int start = 0;
-        double best = Double.MAX_VALUE;
         for (int i = 0; i < this.route.size(); i++) {
-            double d = this.route.get(i).distSqr(feet);
-            if (d < best) {
-                best = d;
+            if (this.route.get(i).distSqr(feet) <= reach * reach) {
                 start = i;
             }
         }

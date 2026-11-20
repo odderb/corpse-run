@@ -44,6 +44,12 @@ public abstract class ServerPlayerMixin implements GhostData {
     private long corpserun$lastReset;
     @Unique
     private long corpserun$protectedUntil;
+    @Unique
+    private long corpserun$resurrectPromptUntil;
+    @Unique
+    private long corpserun$lastHowlHint;
+    @Unique
+    private boolean corpserun$seenIntro;
     // Created lazily in the getters rather than with field initialisers, so they never depend on Mixin
     // merging initialisers into ServerPlayer's constructor.
     @Unique
@@ -104,6 +110,36 @@ public abstract class ServerPlayerMixin implements GhostData {
     @Override
     public void corpserun$setInRange(boolean inRange) {
         this.corpserun$inRange = inRange;
+    }
+
+    @Override
+    public long corpserun$getLastHowlHint() {
+        return this.corpserun$lastHowlHint;
+    }
+
+    @Override
+    public void corpserun$setLastHowlHint(long millis) {
+        this.corpserun$lastHowlHint = millis;
+    }
+
+    @Override
+    public boolean corpserun$hasSeenIntro() {
+        return this.corpserun$seenIntro;
+    }
+
+    @Override
+    public void corpserun$setSeenIntro(boolean seen) {
+        this.corpserun$seenIntro = seen;
+    }
+
+    @Override
+    public long corpserun$getResurrectPromptUntil() {
+        return this.corpserun$resurrectPromptUntil;
+    }
+
+    @Override
+    public void corpserun$setResurrectPromptUntil(long tick) {
+        this.corpserun$resurrectPromptUntil = tick;
     }
 
     @Override
@@ -184,6 +220,12 @@ public abstract class ServerPlayerMixin implements GhostData {
         if (this.corpserun$lastGround != null) {
             data.put("LastGround", this.corpserun$lastGround.save());
         }
+        if (this.corpserun$lastHowlHint != 0L) {
+            data.putLong("LastHowlHint", this.corpserun$lastHowlHint);
+        }
+        if (this.corpserun$seenIntro) {
+            data.putBoolean("SeenIntro", true);
+        }
         tag.put(CORPSERUN$TAG, data);
     }
 
@@ -194,6 +236,8 @@ public abstract class ServerPlayerMixin implements GhostData {
         this.corpserun$getTrail().copyFrom(TrailStack.load(data, "Trail"));
         EtherealBlocks.load(data, "EtherealBlocks", this.corpserun$getEtherealBlocks());
         this.corpserun$lastGround = data.contains("LastGround") ? GroundPos.load(data.getCompound("LastGround")) : null;
+        this.corpserun$lastHowlHint = data.getLong("LastHowlHint");
+        this.corpserun$seenIntro = data.getBoolean("SeenIntro");
     }
 
     /**

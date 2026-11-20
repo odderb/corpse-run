@@ -1,6 +1,7 @@
 package com.corpserun;
 
 import com.corpserun.client.CorpseRenderer;
+import com.corpserun.client.CorpseHighlight;
 import com.corpserun.client.EtherealVisibility;
 import com.corpserun.client.FootprintParticle;
 import com.corpserun.client.SingingParticle;
@@ -26,6 +27,9 @@ public class CorpseRunFabricClient implements ClientModInitializer {
         // NeoForge reads render_type from the block model; Fabric needs it set here.
         BlockRenderLayerMap.INSTANCE.putBlock(CorpseRun.ETHEREAL_BLOCK.get(), RenderType.translucent());
 
-        ClientTickEvents.END_CLIENT_TICK.register(minecraft -> EtherealVisibility.update());
+        ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
+            EtherealVisibility.update();
+            CorpseHighlight.update();
+        });
     }
 }

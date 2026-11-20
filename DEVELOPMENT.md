@@ -11,8 +11,11 @@ Ghosts are drawn with a custom model loaded from Blockbench's **Bedrock** export
 
 Supported: bones (pivot, rotation, parent), cubes with box UV, inflate, mirror and their own rotation; position, rotation and scale keyframes with linear or catmullrom easing. Not supported: per-face UV, meshes, Molang expressions. In a running dev client, F3+T reloads the files; errors are logged and a plain cube is shown instead.
 
+## Testing with Create Aeronautics
+NeoForge dev runs (`runClient`, `runServer`, `runMultiplayer`) also load Sable, Create and Create Aeronautics, so corpses on airships (Sable sub-levels) can be tested. They only exist in dev runs; the mod just bundles Sable Companion, which does nothing without Sable. Versions are in `gradle.properties`. To test without them, set `dev_aeronautics=false` there, or pass `-Pdev_aeronautics=false` for a single run (e.g. `./gradlew :neoforge:runClient -Pdev_aeronautics=false`).
+
 ## Testing multiplayer locally
-`./gradlew :neoforge:runMultiplayer` (or `:fabric:runMultiplayer`) starts a local dedicated server, waits for it to come up, then opens two clients, `Player1` and `Player2`, that join it automatically. Close both game windows to stop the server; cancelling the build with Ctrl+C stops everything.
+`./gradlew :neoforge:runMultiplayer` (or `:fabric:runMultiplayer`) starts a local dedicated server, waits for it to come up, then opens two clients, `Player1` and `Player2`, that join it automatically. Both are operators on the server. Close both game windows to stop the server; cancelling the build with Ctrl+C stops everything.
 
 - Each game gets its own folder: `runs/mp-server`, `runs/mp-client1` and `runs/mp-client2` inside the loader's folder. Console output goes to `console.log` in each.
 - The first run stops and asks you to accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) by setting `eula=true` in `runs/mp-server/eula.txt`.

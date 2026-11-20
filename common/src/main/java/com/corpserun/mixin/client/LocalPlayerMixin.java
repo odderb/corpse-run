@@ -14,15 +14,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Lets a swimming ghost bob back up onto the water or lava it walks on: when its head breaks the surface of a still
- * one while moving up (and not sneaking), it gets a jump-sized boost that lifts its feet above the surface, and the fluid-walking
- * collision (LivingEntityMixin) catches it on the way down. Client-side, where the local player's movement is computed.
+ * one while moving up (and not sneaking), it gets a boost that lifts its feet above the top of that block, and the
+ * fluid-walking collision (LiquidBlockMixin) catches it on the way down. Client-side, where the local player's
+ * movement is computed.
  */
 @Mixin(LocalPlayer.class)
 public abstract class LocalPlayerMixin {
 
-    /** Upward speed given on breaking the surface; vanilla's jump is 0.42. Lifts the feet about 1.6 blocks. */
+    /**
+     * Upward speed given on breaking the surface; vanilla's jump is 0.42. Once the head is out, canStandOnFluid
+     * (LivingEntityMixin) switches the ghost to normal air physics, in water and lava alike, so this lifts the feet
+     * about 2.4 blocks. They start about 1.73 below the block's top (eye height 1.62, surface at 8/9 of the block),
+     * so they clear it with room to spare and land on top.
+     */
     @Unique
-    private static final double CORPSERUN$SURFACE_BOOST = 0.5;
+    private static final double CORPSERUN$SURFACE_BOOST = 0.6;
 
     @Unique
     private boolean corpserun$eyeWasInFluid;

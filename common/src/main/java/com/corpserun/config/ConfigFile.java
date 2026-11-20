@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -14,13 +15,16 @@ import java.util.Properties;
 /**
  * One {@code .properties} file in the config folder. Missing or invalid values fall back to their defaults (with a
  * warning for invalid ones). When the file doesn't exist yet, a commented one with every default is written once by
- * {@link #writeDefaultsIfMissing()}. An existing file is only rewritten by {@link #save()}, for the in-game config
- * screen.
+ * {@link #writeDefaultsIfMissing()}; for an existing file, that only appends keys it doesn't have yet (settings added
+ * in a later version), leaving everything already in it untouched. An existing file is only rewritten by
+ * {@link #save()}, for the in-game config screen.
  */
 final class ConfigFile {
 
     private final Path path;
     private final boolean exists;
+    /** False if the existing file couldn't be read: then nothing is known to be missing, so nothing is appended. */
+    private boolean readOk = true;
     private final Properties props = new Properties();
     private final String header;
     /** Every key read so far, in order, with its comment and default: what gets written back. */
@@ -34,6 +38,7 @@ final class ConfigFile {
             try (Reader reader = Files.newBufferedReader(this.path)) {
                 this.props.load(reader);
             } catch (IOException e) {
+                this.readOk = false;
                 Constants.LOG.error("Failed to read {}, using defaults", this.path, e);
             }
         }
@@ -89,10 +94,39 @@ final class ConfigFile {
         this.props.setProperty(key, String.valueOf(value));
     }
 
-    /** Writes the commented defaults collected by the getters, but only if the file doesn't exist yet. */
+    /**
+     * Writes the commented defaults collected by the getters if the file doesn't exist yet. If it does, appends only
+     * the keys it doesn't have, each with its comment and default; what's already in the file is never changed.
+     */
     void writeDefaultsIfMissing() {
         if (!this.exists) {
             write(false);
+        } else if (this.readOk) {
+            appendMissing();
+        }
+    }
+
+    private void appendMissing() {
+        StringBuilder text = new StringBuilder();
+        for (Entry entry : this.entries) {
+            if (!this.props.containsKey(entry.key())) {
+                text.append('\n').append("# ").append(entry.comment())
+                        .append('\n').append(entry.key()).append('=').append(entry.fallback()).append('\n');
+            }
+        }
+        if (text.isEmpty()) {
+            return;
+        }
+        try {
+            // Start on a fresh line if the file doesn't end with one, so the first key isn't glued to its last line.
+            String existing = Files.readString(this.path);
+            if (!existing.isEmpty() && !existing.endsWith("\n")) {
+                text.insert(0, '\n');
+            }
+            Files.writeString(this.path, text, StandardOpenOption.APPEND);
+            Constants.LOG.info("Added new settings with their defaults to {}", this.path);
+        } catch (IOException e) {
+            Constants.LOG.error("Failed to add new settings to {}", this.path, e);
         }
     }
 

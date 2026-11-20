@@ -30,6 +30,8 @@ public final class GhostCall {
      * sounds.json and {@link CorpseRun#GHOST_CALL_SOUNDS}), played from {@code sounds/ghost/call<i+1>.ogg}.
      */
     public static final int CLIP_COUNT = 4;
+    /** The corpse stays highlighted for this many times the howl's length (counted from its start). */
+    private static final int CORPSE_HIGHLIGHT_FACTOR = 2;
     /** The next call is allowed once this much of the current clip has played. */
     private static final double COOLDOWN_FRACTION = 0.75;
     /** Used when a clip's length can't be read. */
@@ -67,8 +69,13 @@ public final class GhostCall {
         }
 
         boolean isPlaying(int now) {
+            return isWithin(now, this.lengthTicks);
+        }
+
+        /** True for the first {@code ticks} ticks after the song started. */
+        boolean isWithin(int now, int ticks) {
             int elapsed = elapsed(now);
-            return elapsed >= 0 && elapsed < this.lengthTicks;
+            return elapsed >= 0 && elapsed < ticks;
         }
     }
 
@@ -112,10 +119,19 @@ public final class GhostCall {
         }
     }
 
-    /** True while the ghost's current howl is playing (footprints are only shown then). */
+    /** True while the ghost's current howl is playing (with footprintsOnlyWhenHowling, footprints are only shown then). */
     public static boolean isHowling(ServerPlayer player) {
         Song song = ((GhostData) player).corpserun$getSong();
         return song != null && song.isPlaying(player.server.getTickCount());
+    }
+
+    /**
+     * True while the ghost's corpse should glow for them: from the start of the latest howl for
+     * {@link #CORPSE_HIGHLIGHT_FACTOR} times its length. A new howl starts the count over.
+     */
+    public static boolean isCorpseHighlighted(ServerPlayer player) {
+        Song song = ((GhostData) player).corpserun$getSong();
+        return song != null && song.isWithin(player.server.getTickCount(), song.lengthTicks() * CORPSE_HIGHLIGHT_FACTOR);
     }
 
     /** Called every tick for ghosts: emits the next note while the song plays. */

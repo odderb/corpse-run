@@ -1,5 +1,6 @@
 package com.corpserun;
 
+import com.corpserun.client.CorpseHighlight;
 import com.corpserun.client.EtherealVisibility;
 import com.corpserun.client.GhostHud;
 import com.corpserun.client.GhostScreenEffect;
@@ -34,6 +35,7 @@ public final class CorpseRunNeoForgeClientEvents {
     @SubscribeEvent
     public static void clientTick(ClientTickEvent.Post event) {
         EtherealVisibility.update();
+        CorpseHighlight.update();
     }
 
     /** Before anything of the HUD is drawn: the ghost static goes over the finished world frame. */

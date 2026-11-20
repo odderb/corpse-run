@@ -38,6 +38,15 @@ repositories {
         )
         filter { includeGroup('org.parchmentmc.data') }
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'RyanHCode'
+                url = 'https://maven.ryanhcode.dev/releases'
+            }
+        }
+        filter { includeGroup('dev.ryanhcode.sable-companion') }
+    }
 }
 
 // Declare capabilities on the outgoing configurations.
@@ -91,6 +100,8 @@ processResources {
             'license'                      : license,
             'description'                  : project.description,
             'neoforge_version'             : neoforge_version,
+            'neoforge_min_version'         : neoforge_min_version,
+            'neoforge_max_version'         : neoforge_max_version,
             'neoforge_loader_version_range': neoforge_loader_version_range,
             'credits'                      : credits,
             'java_version'                 : java_version

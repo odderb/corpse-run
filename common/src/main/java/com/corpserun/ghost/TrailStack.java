@@ -95,6 +95,17 @@ public final class TrailStack {
         return null;
     }
 
+    /** The oldest non-empty segment (its first point is the earliest point still recorded), or null if none. */
+    @Nullable
+    public TrailSegment earliest() {
+        for (TrailSegment segment : this.segments) {
+            if (!segment.isEmpty()) {
+                return segment;
+            }
+        }
+        return null;
+    }
+
     public int segmentCount() {
         return this.segments.size();
     }

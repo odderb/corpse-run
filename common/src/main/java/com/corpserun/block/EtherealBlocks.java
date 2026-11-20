@@ -70,6 +70,9 @@ public final class EtherealBlocks {
                 pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, true);
 
         Deque<GlobalPos> placed = placed(player);
+        // An older entry for this spot (its block was replaced and later cleared) would remove this new block when
+        // it's evicted: drop it, so the spot is only listed once, as the newest.
+        placed.remove(placedPos);
         placed.addLast(placedPos);
         while (placed.size() > limit) {
             remove(player.server, placed.pollFirst());

@@ -41,6 +41,10 @@ public final class TrailSegment {
         return this.points.isEmpty();
     }
 
+    public BlockPos first() {
+        return BlockPos.of(this.points.getLong(0));
+    }
+
     public BlockPos last() {
         return BlockPos.of(this.points.getLong(this.points.size() - 1));
     }

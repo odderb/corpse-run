@@ -25,6 +25,12 @@ dependencies {
     // Optional: only used for the config screen button. Also in dev runs, to test it.
     modCompileOnly "com.terraformersmc:modmenu:${modmenu_version}"
     modLocalRuntime "com.terraformersmc:modmenu:${modmenu_version}"
+    // Sable sub-levels (Create Aeronautics). Bundled; does nothing without Sable. The fabric jar is already in
+    // intermediary names but was built with a newer Loom than this one can remap, so it is bundled untouched and
+    // the Mojang-named common jar is used to compile and for dev runs.
+    include "dev.ryanhcode.sable-companion:sable-companion-fabric-${minecraft_version}:${sable_companion_version}"
+    compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
+    localRuntime "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
 }
 
 loom {
@@ -71,4 +77,6 @@ loom {
 
 ext.multiplayerServerRun = 'runMpServer'
 ext.multiplayerClientRuns = ['runMpClient1', 'runMpClient2']
+// The clients' --username values; all of them are made operators on the test server.
+ext.multiplayerPlayers = ['Player1', 'Player2']
 apply from: rootProject.file('gradle/multiplayer.gradle')
