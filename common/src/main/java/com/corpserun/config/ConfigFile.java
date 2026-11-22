@@ -46,47 +46,57 @@ final class ConfigFile {
 
     /** A number of at least 0. */
     double getDouble(String key, double fallback, String comment) {
-        addDefault(key, fallback, comment);
+        double value = fallback;
         String raw = this.props.getProperty(key);
         if (raw != null) {
             try {
-                return Math.max(0.0, Double.parseDouble(raw.trim()));
+                value = Math.max(0.0, Double.parseDouble(raw.trim()));
             } catch (NumberFormatException e) {
                 warnInvalid(key, raw, fallback);
             }
         }
-        return fallback;
+        addEntry(key, ConfigSetting.Kind.DOUBLE, fallback, value, comment);
+        return value;
     }
 
     /** A whole number of at least {@code min}. */
     int getInt(String key, int fallback, int min, String comment) {
-        addDefault(key, fallback, comment);
+        int value = fallback;
         String raw = this.props.getProperty(key);
         if (raw != null) {
             try {
-                return Math.max(min, Integer.parseInt(raw.trim()));
+                value = Math.max(min, Integer.parseInt(raw.trim()));
             } catch (NumberFormatException e) {
                 warnInvalid(key, raw, fallback);
             }
         }
-        return fallback;
+        addEntry(key, ConfigSetting.Kind.INT, fallback, value, comment);
+        return value;
     }
 
     /** {@code true} or {@code false} (any case); anything else falls back to the default. */
     boolean getBoolean(String key, boolean fallback, String comment) {
-        addDefault(key, fallback, comment);
+        boolean value = fallback;
         String raw = this.props.getProperty(key);
         if (raw != null) {
-            String value = raw.trim();
-            if (value.equalsIgnoreCase("true")) {
-                return true;
+            String trimmed = raw.trim();
+            if (trimmed.equalsIgnoreCase("true")) {
+                value = true;
+            } else if (trimmed.equalsIgnoreCase("false")) {
+                value = false;
+            } else {
+                warnInvalid(key, raw, fallback);
             }
-            if (value.equalsIgnoreCase("false")) {
-                return false;
-            }
-            warnInvalid(key, raw, fallback);
         }
-        return fallback;
+        addEntry(key, ConfigSetting.Kind.BOOLEAN, fallback, value, comment);
+        return value;
+    }
+
+    /** Every setting read so far, in order, with the value in effect (what the getters returned). */
+    List<ConfigSetting> settings() {
+        return this.entries.stream()
+                .map(entry -> new ConfigSetting(entry.key(), entry.kind(), entry.value(), entry.fallback(), entry.comment()))
+                .toList();
     }
 
     /** Replaces a value before it's read, as if the file held it. Written out by {@link #save()}. */
@@ -154,14 +164,14 @@ final class ConfigFile {
         }
     }
 
-    private void addDefault(String key, Object value, String comment) {
-        this.entries.add(new Entry(key, String.valueOf(value), comment));
+    private void addEntry(String key, ConfigSetting.Kind kind, Object fallback, Object value, String comment) {
+        this.entries.add(new Entry(key, kind, String.valueOf(fallback), String.valueOf(value), comment));
     }
 
     private void warnInvalid(String key, String raw, Object fallback) {
         Constants.LOG.warn("Invalid {} '{}' in {}, using {}", key, raw, this.path, fallback);
     }
 
-    private record Entry(String key, String fallback, String comment) {
+    private record Entry(String key, ConfigSetting.Kind kind, String fallback, String value, String comment) {
     }
 }

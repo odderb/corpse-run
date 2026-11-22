@@ -186,7 +186,8 @@ public final class GhostGuide {
         BlockPos target = remainder.get(0);
         this.routeSegment = segment;
 
-        if (target.distSqr(feet) <= ON_TRAIL_DISTANCE_SQR) {
+        // Footstep pathfinding off: no search at all, the footsteps just follow the recorded trail from the joined point.
+        if (!CorpseRunConfig.footstepPathfinding() || target.distSqr(feet) <= ON_TRAIL_DISTANCE_SQR) {
             this.route = remainder;
             return;
         }

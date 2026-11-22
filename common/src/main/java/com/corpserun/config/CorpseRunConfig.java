@@ -1,5 +1,8 @@
 package com.corpserun.config;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * Server (gameplay) settings, from {@code config/corpserun-server.properties}. Loaded on both dedicated servers and
  * clients (for singleplayer). Client-only settings live in {@link CorpseRunClientConfig}.
@@ -22,6 +25,11 @@ public final class CorpseRunConfig {
     private static int etherealBlockLimit = 3;
     private static double wanderDistance = 64.0;
     private static boolean ghostsVisibleToLiving = false;
+    private static boolean footstepPathfinding = true;
+    private static boolean etherealBlocks = true;
+    private static boolean ghostFlight = false;
+    private static boolean sculkIgnoresGhosts = true;
+    private static boolean howlTriggersSculk = true;
 
     private CorpseRunConfig() {
     }
@@ -84,8 +92,65 @@ public final class CorpseRunConfig {
         return wanderDistance;
     }
 
+    /** Whether footsteps are pathfound from the ghost to its trail; false runs no path searches at all. */
+    public static boolean footstepPathfinding() {
+        return footstepPathfinding;
+    }
+
+    /** Whether ghosts can place ethereal blocks at all (etherealBlockLimit 0 does the same). */
+    public static boolean etherealBlocks() {
+        return etherealBlocks;
+    }
+
+    /** Whether ghosts may fly as in creative (flight only, not the game mode). */
+    public static boolean ghostFlight() {
+        return ghostFlight;
+    }
+
+    /** Whether sculk (and anything else listening for vibrations) ignores everything ghosts do, except howling. */
+    public static boolean sculkIgnoresGhosts() {
+        return sculkIgnoresGhosts;
+    }
+
+    /** Whether a howl makes a vibration that sets sculk off, like a goat horn. */
+    public static boolean howlTriggersSculk() {
+        return howlTriggersSculk;
+    }
+
     public static void load() {
-        ConfigFile file = new ConfigFile(FILE_NAME, "CorpseRun server settings");
+        ConfigFile file = open();
+        read(file);
+        file.writeDefaultsIfMissing();
+    }
+
+    /**
+     * Every setting with its value, for the server settings screen. Re-reads the file, so edits made to it by hand
+     * since startup are picked up (and applied) here too.
+     */
+    public static List<ConfigSetting> settings() {
+        ConfigFile file = open();
+        read(file);
+        return file.settings();
+    }
+
+    /**
+     * Applies new values (by key, as text, as in the file) from the server settings screen and saves them. Anything
+     * invalid falls back to its default, as when loading. Call on the server thread when a server is running, since
+     * the server reads these as it ticks.
+     */
+    public static void update(Map<String, String> values) {
+        ConfigFile file = open();
+        values.forEach(file::set);
+        // Read back through the same parsing as the file, so the values are clamped the same way.
+        read(file);
+        file.save();
+    }
+
+    private static ConfigFile open() {
+        return new ConfigFile(FILE_NAME, "CorpseRun server settings");
+    }
+
+    private static void read(ConfigFile file) {
         resurrectRange = file.getDouble("resurrectRange", 10.0,
                 "Distance in blocks from your corpse within which you can /resurrect");
         footprints = file.getBoolean("footprints", true,
@@ -114,6 +179,15 @@ public final class CorpseRunConfig {
                 "Whether living players can see ghosts (and their notes); false = only ghosts see ghosts");
         wanderDistance = file.getDouble("wanderDistance", 64.0,
                 "Blocks from the nearest point of the trail back before a ghost is offered /corpse reset, 0 disables");
-        file.writeDefaultsIfMissing();
+        footstepPathfinding = file.getBoolean("footstepPathfinding", true,
+                "Footsteps pathfind from the ghost back to its trail; false only shows them along the recorded trail and runs no path searches, to save server performance");
+        etherealBlocks = file.getBoolean("etherealBlocks", true,
+                "Ghosts can place ethereal blocks by right-clicking with an empty hand");
+        ghostFlight = file.getBoolean("ghostFlight", false,
+                "Ghosts can fly like in creative mode (double-tap jump); only the flight, not the game mode");
+        sculkIgnoresGhosts = file.getBoolean("sculkIgnoresGhosts", true,
+                "Sculk sensors, shriekers and wardens don't notice ghosts walking, landing, swimming, opening doors...");
+        howlTriggersSculk = file.getBoolean("howlTriggersSculk", true,
+                "A ghost's howl sets off sculk like a goat horn, even when sculk ignores ghosts otherwise");
     }
 }

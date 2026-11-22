@@ -50,6 +50,8 @@ public abstract class ServerPlayerMixin implements GhostData {
     private long corpserun$lastHowlHint;
     @Unique
     private boolean corpserun$seenIntro;
+    @Unique
+    private boolean corpserun$grantedFlight;
     // Created lazily in the getters rather than with field initialisers, so they never depend on Mixin
     // merging initialisers into ServerPlayer's constructor.
     @Unique
@@ -179,6 +181,16 @@ public abstract class ServerPlayerMixin implements GhostData {
     }
 
     @Override
+    public boolean corpserun$hasGrantedFlight() {
+        return this.corpserun$grantedFlight;
+    }
+
+    @Override
+    public void corpserun$setGrantedFlight(boolean granted) {
+        this.corpserun$grantedFlight = granted;
+    }
+
+    @Override
     public GhostGuide corpserun$getGuide() {
         if (this.corpserun$guide == null) {
             this.corpserun$guide = new GhostGuide();
@@ -226,6 +238,9 @@ public abstract class ServerPlayerMixin implements GhostData {
         if (this.corpserun$seenIntro) {
             data.putBoolean("SeenIntro", true);
         }
+        if (this.corpserun$grantedFlight) {
+            data.putBoolean("GrantedFlight", true);
+        }
         tag.put(CORPSERUN$TAG, data);
     }
 
@@ -238,6 +253,7 @@ public abstract class ServerPlayerMixin implements GhostData {
         this.corpserun$lastGround = data.contains("LastGround") ? GroundPos.load(data.getCompound("LastGround")) : null;
         this.corpserun$lastHowlHint = data.getLong("LastHowlHint");
         this.corpserun$seenIntro = data.getBoolean("SeenIntro");
+        this.corpserun$grantedFlight = data.getBoolean("GrantedFlight");
     }
 
     /**
