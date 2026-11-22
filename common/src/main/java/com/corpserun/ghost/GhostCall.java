@@ -2,6 +2,7 @@ package com.corpserun.ghost;
 
 import com.corpserun.Constants;
 import com.corpserun.CorpseRun;
+import com.corpserun.config.CorpseRunConfig;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
@@ -9,6 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
 
 import java.io.InputStream;
@@ -79,7 +81,15 @@ public final class GhostCall {
         }
     }
 
+    /** True only while a howl's game event is being posted, so it gets past ServerLevelMixin (server thread only). */
+    private static boolean emittingHowl;
+
     private GhostCall() {
+    }
+
+    /** Whether the game event being posted is a ghost's howl: the only one a ghost causes that sculk may hear. */
+    public static boolean isEmittingHowl() {
+        return emittingHowl;
     }
 
     /** Handles {@link GhostCallPayload} on the server thread. */
@@ -108,6 +118,15 @@ public final class GhostCall {
         player.level().playSound(null, player, sound, SoundSource.PLAYERS, 1.0F, pitch);
         // Players the ghost is hidden from don't know the entity, so they'd drop that packet. They get the sound at
         // the ghost's position instead: they hear it, it just stays where it started.
+        // A howl sets sculk off like a goat horn would, even while sculkIgnoresGhosts hides everything else.
+        if (CorpseRunConfig.howlTriggersSculk()) {
+            emittingHowl = true;
+            try {
+                player.serverLevel().gameEvent(GameEvent.INSTRUMENT_PLAY, player.position(), GameEvent.Context.of(player));
+            } finally {
+                emittingHowl = false;
+            }
+        }
         Holder<SoundEvent> holder = BuiltInRegistries.SOUND_EVENT.wrapAsHolder(sound);
         double range = sound.getRange(1.0F);
         long seed = player.getRandom().nextLong();

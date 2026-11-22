@@ -52,6 +52,11 @@ public interface GhostData {
     /** This ghost's ethereal blocks, oldest first (saved, so they're cleaned up after a restart). */
     Deque<GlobalPos> corpserun$getEtherealBlocks();
 
+    /** Whether ghost flight (ghostFlight) gave this player mayfly, so only that is taken away again (saved). */
+    boolean corpserun$hasGrantedFlight();
+
+    void corpserun$setGrantedFlight(boolean granted);
+
     /** Footprint guidance while a ghost (not saved). */
     GhostGuide corpserun$getGuide();
 

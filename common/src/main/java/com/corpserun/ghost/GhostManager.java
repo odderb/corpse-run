@@ -28,6 +28,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -323,6 +324,7 @@ public final class GhostManager {
             player.getAbilities().mayBuild = false;
             player.onUpdateAbilities();
         }
+        enforceGhostFlight(player);
 
         // Transient (not saved), so it's simply reapplied here after respawn/relog and can't outlive ghost form.
         AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
@@ -336,6 +338,29 @@ public final class GhostManager {
             } else if (current == null || current.amount() != bonus) {
                 speed.addOrUpdateTransientModifier(
                         new AttributeModifier(SPEED_MODIFIER, bonus, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+            }
+        }
+    }
+
+    /**
+     * Creative-style flight for ghosts while ghostFlight is on. Only flight the mod granted is ever taken away (when
+     * the setting was turned off since), so flight from creative, spectator or other mods is left alone.
+     */
+    private static void enforceGhostFlight(ServerPlayer player) {
+        GhostData data = data(player);
+        Abilities abilities = player.getAbilities();
+        if (CorpseRunConfig.ghostFlight()) {
+            if (!abilities.mayfly) {
+                abilities.mayfly = true;
+                data.corpserun$setGrantedFlight(true);
+                player.onUpdateAbilities();
+            }
+        } else if (data.corpserun$hasGrantedFlight()) {
+            data.corpserun$setGrantedFlight(false);
+            if (!player.gameMode.getGameModeForPlayer().isCreative() && !player.isSpectator()) {
+                abilities.mayfly = false;
+                abilities.flying = false;
+                player.onUpdateAbilities();
             }
         }
     }
@@ -434,8 +459,10 @@ public final class GhostManager {
         // Cut off a hum that's still playing instead of letting it ring out.
         player.connection.send(new ClientboundStopSoundPacket(SoundEvents.BEACON_AMBIENT.getLocation(), HUM_SOURCE));
 
+        // Also takes away ghost flight (unless the game mode allows flying).
         player.gameMode.getGameModeForPlayer().updatePlayerAbilities(player.getAbilities());
         player.onUpdateAbilities();
+        data.corpserun$setGrantedFlight(false);
 
         data.corpserun$setResurrectPromptUntil(0L);
         if (protect) {

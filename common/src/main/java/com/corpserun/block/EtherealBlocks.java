@@ -50,7 +50,7 @@ public final class EtherealBlocks {
     /** Ghost right-clicked a block face with an empty main hand: place one against that face. */
     public static InteractionResult tryPlace(ServerPlayer player, ServerLevel level, BlockHitResult hit) {
         int limit = CorpseRunConfig.etherealBlockLimit();
-        if (limit <= 0) {
+        if (!CorpseRunConfig.etherealBlocks() || limit <= 0) {
             return InteractionResult.FAIL;
         }
 
@@ -81,11 +81,11 @@ public final class EtherealBlocks {
     }
 
     /**
-     * Plays an ethereal block sound (placing, footsteps, landing) only for players who can see the ghost (other
+     * Plays an ethereal block sound (placing) only for players who can see the ghost (other
      * ghosts, or everyone when ghostsVisibleToLiving is on), like the block itself: living players neither see nor
      * hear ethereal blocks.
      *
-     * @param includeGhost also send it to the ghost itself; false when its own client already plays it (footsteps)
+     * @param includeGhost also send it to the ghost itself; false when its own client already plays it
      */
     public static void playForGhostViewers(ServerPlayer ghost, SoundEvent sound, float volume, float pitch,
                                            double x, double y, double z, boolean includeGhost) {

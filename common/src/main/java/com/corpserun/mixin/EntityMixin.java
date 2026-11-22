@@ -3,9 +3,11 @@ package com.corpserun.mixin;
 import com.corpserun.ghost.GhostManager;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.gameevent.GameEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -15,6 +17,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(Entity.class)
 public abstract class EntityMixin {
+
+    /**
+     * Ghosts make no sound walking on amethyst or swimming (see PlayerStepSoundMixin). Cancelled on both sides, like
+     * footsteps.
+     */
+    @Inject(method = {"playAmethystStepSound", "playSwimSound"}, at = @At("HEAD"), cancellable = true)
+    private void corpserun$ghostsMoveSilently(CallbackInfo ci) {
+        if (GhostManager.isGhost((Entity) (Object) this)) {
+            ci.cancel();
+        }
+    }
+
+    /**
+     * Ghosts splash into water without a sound or splash particles. The splash game event is still posted, so sculk
+     * notices it when sculkIgnoresGhosts is off (ServerLevelMixin drops it otherwise).
+     */
+    @Inject(method = "doWaterSplashEffect", at = @At("HEAD"), cancellable = true)
+    private void corpserun$ghostsSplashSilently(CallbackInfo ci) {
+        Entity self = (Entity) (Object) this;
+        if (GhostManager.isGhost(self)) {
+            ci.cancel();
+            self.gameEvent(GameEvent.SPLASH);
+        }
+    }
 
     @Inject(method = "fireImmune", at = @At("HEAD"), cancellable = true)
     private void corpserun$ghostsFireImmune(CallbackInfoReturnable<Boolean> cir) {

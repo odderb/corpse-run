@@ -17,6 +17,8 @@
     "PlayerFoodMixin",
     "PlayerMixin",
     "PlayerStepSoundMixin",
+    "SculkStepMixin",
+    "ServerLevelMixin",
     "ServerPlayerGameModeMixin",
     "ServerPlayerMixin"
   ],

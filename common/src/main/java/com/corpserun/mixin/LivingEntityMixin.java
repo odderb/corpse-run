@@ -1,22 +1,17 @@
 package com.corpserun.mixin;
 
 import com.corpserun.CorpseRun;
-import com.corpserun.block.EtherealBlocks;
 import com.corpserun.ghost.GhostManager;
-import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -70,22 +65,16 @@ public abstract class LivingEntityMixin {
         }
     }
 
-    /** Landing on an ethereal block: only heard by players who can see ghosts (see PlayerStepSoundMixin). */
-    @Inject(method = "playBlockFallSound", at = @At("HEAD"), cancellable = true)
-    private void corpserun$etherealLandingGhostOnly(CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (!(self instanceof ServerPlayer ghost) || !GhostManager.isGhost(ghost)) {
-            return;
-        }
-        BlockPos below = BlockPos.containing(ghost.getX(), ghost.getY() - 0.2, ghost.getZ());
-        BlockState state = ghost.level().getBlockState(below);
-        if (state.is(CorpseRun.ETHEREAL_BLOCK.get())) {
-            ci.cancel();
-            if (!ghost.isSilent()) {
-                SoundType sound = state.getSoundType();
-                EtherealBlocks.playForGhostViewers(ghost, sound.getFallSound(), sound.getVolume() * 0.5F, sound.getPitch() * 0.75F,
-                        ghost.getX(), ghost.getY(), ghost.getZ(), false);
-            }
+    /**
+     * Ghosts land silently: no landing thud or fall damage sound. Those only play when a fall would deal damage, and
+     * ghosts take none (ServerPlayerMixin), so the whole call is skipped. Runs on both sides, since the falling
+     * player's own client plays these sounds locally.
+     */
+    @Inject(method = "causeFallDamage", at = @At("HEAD"), cancellable = true)
+    private void corpserun$ghostsLandSilently(float fallDistance, float multiplier, DamageSource source,
+                                              CallbackInfoReturnable<Boolean> cir) {
+        if (GhostManager.isGhost((LivingEntity) (Object) this)) {
+            cir.setReturnValue(false);
         }
     }
 
